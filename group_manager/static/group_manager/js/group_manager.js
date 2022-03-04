@@ -543,69 +543,9 @@ $(function() {
                         : 'Select a category'
                 );
 
-                $el.select2({
-                    ajax: {
-                        quietMillis: 200,
-                        url:      '/group_manager/get_categories',
-                        type:     'post',
-                        dataType: 'json',
-                        data: function (term, page) {
-                            return { query: term };
-                        },
-                        results: function (data) {
-                            var categories = data.categories
-                            var results = [];
-                            var query   = $el.data('select2').search.val();
-                            var inputMatches = false;
+                let e = $el.select2({
+                    theme: 'bootstrap-5',
 
-                            // For legacy reasons we allow selecting existing categories with illegal names.
-                            // New categories (where we show '(create)' in the dropdown) must adhere to the new rules:
-                            // They must be valid as part of a group name -> only lowercase letters, numbers and hyphens.
-                            //
-                            // When we drop support for the old category name style this code can be updated to
-                            // automatically lowercase user input (see the username input code for an example).
-
-                            categories.forEach(function(category) {
-                                if (query === category)
-                                    inputMatches = true;
-
-                                if (that.isManagerInCategory(category))
-                                    results.push({
-                                        id:   category,
-                                        text: category,
-                                    });
-                                else if (inputMatches)
-                                    // Only show a (disabled) category the user doesn't have access to
-                                    // if they type its exact name.
-                                    results.push({
-                                        id:       category,
-                                        text:     category,
-                                        disabled: true,
-                                    });
-                            });
-
-                            results.sort(function(a, b) {
-                                return (a.id === b.id  ?  0 :
-                                        a.id === query ? -1 :
-                                        b.id === query ?  1 :
-                                        a.id >=  b.id  ?  1 : -1);
-                            });
-
-                            if (
-                                  !inputMatches
-                                && query.length
-                                && (that.isMemberOfGroup('priv-category-add') || that.isRodsAdmin)
-                            ) {
-                                results.push({
-                                    id:     query,
-                                    text:   query,
-                                    exists: false
-                                });
-                            }
-
-                            return { results: results };
-                        },
-                    },
                     formatResult: function(result, $container, query, escaper) {
                         return escaper(result.text)
                             + (
@@ -636,6 +576,80 @@ $(function() {
                         }
                     }
                 });
+
+                let $categoriesRequest = $.ajax({
+                    quietMillis: 200,
+                    url:      '/group_manager/get_categories',
+                    type:     'post',
+                    dataType: 'json',
+                    data: function (term, page) {
+                        return { query: term };
+                    }
+                });
+
+                $categoriesRequest.then(function (data) {
+                    var categories = data.categories;
+                    var results = [];
+                    var query   = $el.data('select2').search.val();
+                    var inputMatches = false;
+
+                    // For legacy reasons we allow selecting existing categories with illegal names.
+                    // New categories (where we show '(create)' in the dropdown) must adhere to the new rules:
+                    // They must be valid as part of a group name -> only lowercase letters, numbers and hyphens.
+                    //
+                    // When we drop support for the old category name style this code can be updated to
+                    // automatically lowercase user input (see the username input code for an example).
+
+                    categories.forEach(function(category) {
+                        if (query === category)
+                            inputMatches = true;
+
+                        if (that.isManagerInCategory(category))
+                            results.push({
+                                id:   category,
+                                text: category,
+                            });
+                        else if (inputMatches)
+                            // Only show a (disabled) category the user doesn't have access to
+                            // if they type its exact name.
+                            results.push({
+                                id:       category,
+                                text:     category,
+                                disabled: true,
+                            });
+                    });
+
+                    results.sort(function(a, b) {
+                        return (a.id === b.id  ?  0 :
+                            a.id === query ? -1 :
+                                b.id === query ?  1 :
+                                    a.id >=  b.id  ?  1 : -1);
+                    });
+
+                    if (
+                        !inputMatches
+                        && query.length
+                        && (that.isMemberOfGroup('priv-category-add') || that.isRodsAdmin)
+                    ) {
+                        results.push({
+                            id:     query,
+                            text:   query,
+                            exists: false
+                        });
+                    }
+
+                    for (var d = 0; d < results.length; d++) {
+                        var item = results[d];
+
+                        // Create the DOM option that is pre-selected by default
+                        var option = new Option(item.text, item.id, true, true);
+
+                        // Append it to the select
+                        $e.append(option);
+                    }
+
+                    $e.trigger('change');
+                });
             });
 
             // }}}
@@ -656,7 +670,7 @@ $(function() {
                                 query: term
                             };
                         },
-                        results: function (data) {
+                        processResults: function (data) {
                             var subcategories = data.subcategories
                             var results = [];
                             var query   = $el.data('select2').search.val();
